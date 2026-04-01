@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fruit_memory</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+      background: #fff8f2;
+      color: #333;
+      text-align: center;
+    }
+
+    .app {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 16px 0 8px;
+      color: #ff6b6b;
+      font-size: 2rem;
+    }
+
+    .sub {
+      margin: 0 0 16px;
+      color: #666;
+      font-size: 0.95rem;
+    }
+
+    .screen {
+      display: none;
+      background: #fff;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .fruit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .fruit-card {
+      background: #fff3e8;
+      border: 2px solid #ffd7b5;
+      border-radius: 18px;
+      padding: 18px 8px;
+    }
+
+    .fruit-emoji {
+      font-size: 3rem;
+      margin-bottom: 8px;
+    }
+
+    .fruit-name {
+      font-size: 1rem;
+      font-weight: bold;
+    }
+
+    .main-btn,
+    .yes-btn,
+    .no-btn {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 20px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .main-btn {
+      background: #ff8c42;
+      color: #fff;
+      margin: 10px auto 0;
+      display: inline-block;
+    }
+
+    .yes-btn {
+      background: #4caf50;
+      color: #fff;
+      flex: 1;
+    }
+
+    .no-btn {
+      background: #5c6bc0;
+      color: #fff;
+      flex: 1;
+    }
+
+    .question-fruit {
+      font-size: 5rem;
+      background: #fff3e8;
+      border: 2px solid #ffd7b5;
+      border-radius: 24px;
+      width: 160px;
+      height: 160px;
+      margin: 20px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .camera-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 540px;
+      margin: 0 auto;
+      aspect-ratio: 4 / 3;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #222;
+    }
+
+    #webcam,
+    #output-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .status-box,
+    .manual-box {
+      margin-top: 16px;
+    }
+
+    .manual-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
+    .result-mark {
+      font-size: 6rem;
+      font-weight: bold;
+      margin: 20px 0 10px;
+    }
+
+    .correct {
+      color: #e53935;
+    }
+
+    .incorrect {
+      color: #1e88e5;
+    }
+
+    .result-text {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    .result-detail {
+      margin-top: 10px;
+    }
+
+    @media (min-width: 700px) {
+      .fruit-grid {
+        grid-template-columns: repeat(5, 1fr);
+      }
+    }
+
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 1.6rem;
+      }
+
+      .question-fruit {
+        width: 130px;
+        height: 130px;
+        font-size: 4rem;
+      }
+
+      .fruit-emoji {
+        font-size: 2.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>フルーツ記憶ゲーム</h1>
+    <p class="sub">右手を上げる＝「はい」 / 左手を上げる＝「いいえ」</p>
+
+    <section id="screen-start" class="screen active">
+      <h2>覚えてください</h2>
+      <p>下のフルーツを覚えてください。</p>
+      <div id="fruit-grid" class="fruit-grid"></div>
+      <p>Enterキー、または「次へ」で進みます</p>
+      <button id="next-btn" class="main-btn">次へ</button>
+    </section>
+
+    <section id="screen-question" class="screen">
+      <h2>このフルーツはありましたか？</h2>
+      <div id="question-fruit" class="question-fruit">🍎</div>
+
+      <div class="camera-wrap">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="output-canvas"></canvas>
+      </div>
+
+      <div class="status-box">
+        <p id="camera-status">カメラを起動しています...</p>
+        <p id="detect-status">右手を上げると「はい」 / 左手を上げると「いいえ」</p>
+      </div>
+
+      <div class="manual-box">
+        <p>うまく反応しないときは下のボタンでも回答できます</p>
+        <div class="manual-buttons">
+          <button id="yes-btn" class="yes-btn">はい</button>
+          <button id="no-btn" class="no-btn">いいえ</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-result" class="screen">
+      <h2>結果</h2>
+      <div id="result-mark" class="result-mark">○</div>
+      <p id="result-text" class="result-text">正解です！</p>
+      <p id="result-detail" class="result-detail"></p>
+      <button id="retry-btn" class="main-btn">もう一度遊ぶ</button>
+    </section>
+  </div>
+
+  <script type="module">
+    import {
+      PoseLandmarker,
+      FilesetResolver
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+
+    const FRUITS = [
+      { name: "りんご", emoji: "🍎" },
+      { name: "みかん", emoji: "🍊" },
+      { name: "バナナ", emoji: "🍌" },
+      { name: "もも", emoji: "🍑" },
+      { name: "いちご", emoji: "🍓" },
+      { name: "ぶどう", emoji: "🍇" }
+    ];
+
+    const screenStart = document.getElementById("screen-start");
+    const screenQuestion = document.getElementById("screen-question");
+    const screenResult = document.getElementById("screen-result");
+
+    const fruitGrid = document.getElementById("fruit-grid");
+    const questionFruit = document.getElementById("question-fruit");
+
+    const nextBtn = document.getElementById("next-btn");
+    const retryBtn = document.getElementById("retry-btn");
+    const yesBtn = document.getElementById("yes-btn");
+    const noBtn = document.getElementById("no-btn");
+
+    const resultMark = document.getElementById("result-mark");
+    const resultText = document.getElementById("result-text");
+    const resultDetail = document.getElementById("result-detail");
+
+    const webcam = document.getElementById("webcam");
+    const canvas = document.getElementById("output-canvas");
+    const ctx = canvas.getContext("2d");
+
+    const cameraStatus = document.getElementById("camera-status");
+    const detectStatus = document.getElementById("detect-status");
+
+    let shownFruits = [];
+    let targetFruit = null;
+    let correctAnswer = false;
+    let gameAnswered = false;
+
+    let poseLandmarker = null;
+    let running = false;
+    let animationId = null;
+
+    let rightCount = 0;
+    let leftCount = 0;
+    const REQUIRED_FRAMES = 8;
+
+    function showScreen(name) {
+      screenStart.classList.remove("active");
+      screenQuestion.classList.remove("active");
+      screenResult.classList.remove("active");
+
+      if (name === "start") screenStart.classList.add("active");
+      if (name === "question") screenQuestion.classList.add("active");
+      if (name === "result") screenResult.classList.add("active");
+    }
+
+    function shuffle(array) {
+      const copied = [...array];
+      for (let i = copied.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copied[i], copied[j]] = [copied[j], copied[i]];
+      }
+      return copied;
+    }
+
+    function createStartFruits() {
+      const picked = shuffle(FRUITS).slice(0, 5);
+      shownFruits = picked;
+      fruitGrid.innerHTML = "";
+
+      picked.forEach(fruit => {
+        const card = document.createElement("div");
+        card.className = "fruit-card";
+        card.innerHTML = `
+          <div class="fruit-emoji">${fruit.emoji}</div>
+          <div class="fruit-name">${fruit.name}</div>
+        `;
+        fruitGrid.appendChild(card);
+      });
+    }
+
+    function createQuestion() {
+      targetFruit = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+      questionFruit.textContent = targetFruit.emoji;
+      correctAnswer = shownFruits.some(f => f.name === targetFruit.name);
+      gameAnswered = false;
+      rightCount = 0;
+      leftCount = 0;
+    }
+
+    function startGame() {
+      createStartFruits();
+      createQuestion();
+      showScreen("start");
+      stopCameraLoop();
+      clearCanvas();
+      cameraStatus.textContent = "カメラはまだ起動していません";
+      detectStatus.textContent = "右手を上げる＝はい / 左手を上げる＝いいえ";
+    }
+
+    function goToQuestionScreen() {
+      showScreen("question");
+      startCamera();
+    }
+
+    function answerGame(userAnswer) {
+      if (gameAnswered) return;
+      gameAnswered = true;
+
+      const isCorrect = userAnswer === correctAnswer;
+
+      if (isCorrect) {
+        resultMark.textContent = "○";
+        resultMark.className = "result-mark correct";
+        resultText.textContent = "正解です！";
+      } else {
+        resultMark.textContent = "×";
+        resultMark.className = "result-mark incorrect";
+        resultText.textContent = "不正解です";
+      }
+
+      resultDetail.textContent =
+        `表示されたフルーツは「${targetFruit.name}」でした。正しい答えは「${correctAnswer ? "はい" : "いいえ"}」です。`;
+
+      stopCameraLoop();
+      showScreen("result");
+    }
+
+    async function setupPoseLandmarker() {
+      cameraStatus.textContent = "姿勢認識を準備しています...";
+
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+
+      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task"
+        },
+        runningMode: "VIDEO",
+        numPoses: 1
+      });
+
+      cameraStatus.textContent = "姿勢認識の準備ができました";
+    }
+
+    async function startCamera() {
+      try {
+        if (!poseLandmarker) {
+          await setupPoseLandmarker();
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+
+        webcam.srcObject = stream;
+
+        webcam.onloadedmetadata = () => {
+          webcam.play();
+          canvas.width = webcam.videoWidth || 640;
+          canvas.height = webcam.videoHeight || 480;
+          cameraStatus.textContent = "カメラ起動中";
+          running = true;
+          predictLoop();
+        };
+      } catch (error) {
+        console.error(error);
+        cameraStatus.textContent = "エラー: " + error.message;
+        detectStatus.textContent = "下の「はい」「いいえ」ボタンで回答してください";
+      }
+    }
+
+    function stopCameraLoop() {
+      running = false;
+
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+
+      const stream = webcam.srcObject;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        webcam.srcObject = null;
+      }
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width || 640, canvas.height || 480);
+    }
+
+    function drawVideoFrame() {
+      if (!webcam.videoWidth || !webcam.videoHeight) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+    }
+
+    function drawPoint(x, y, radius = 6) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#00d084";
+      ctx.fill();
+    }
+
+    function drawLine(x1, y1, x2, y2) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+    }
+
+    function predictLoop() {
+      if (!running || !poseLandmarker || gameAnswered) return;
+
+      drawVideoFrame();
+
+      const nowMs = performance.now();
+      const result = poseLandmarker.detectForVideo(webcam, nowMs);
+
+      if (result.landmarks && result.landmarks.length > 0) {
+        const lm = result.landmarks[0];
+
+        const leftShoulder = lm[11];
+        const rightShoulder = lm[12];
+        const leftWrist = lm[15];
+        const rightWrist = lm[16];
+
+        if (leftShoulder && rightShoulder && leftWrist && rightWrist) {
+          const points = [leftShoulder, rightShoulder, leftWrist, rightWrist];
+          points.forEach(p => drawPoint(p.x * canvas.width, p.y * canvas.height, 8));
+
+          drawLine(
+            leftShoulder.x * canvas.width, leftShoulder.y * canvas.height,
+            leftWrist.x * canvas.width, leftWrist.y * canvas.height
+          );
+          drawLine(
+            rightShoulder.x * canvas.width, rightShoulder.y * canvas.height,
+            rightWrist.x * canvas.width, rightWrist.y * canvas.height
+          );
+
+          const leftRaised = leftWrist.y < leftShoulder.y - 0.05;
+          const rightRaised = rightWrist.y < rightShoulder.y - 0.05;
+
+          if (rightRaised && !leftRaised) {
+            rightCount++;
+            leftCount = 0;
+            detectStatus.textContent = `右手を検出中...（${rightCount}/${REQUIRED_FRAMES}）→ はい`;
+          } else if (leftRaised && !rightRaised) {
+            leftCount++;
+            rightCount = 0;
+            detectStatus.textContent = `左手を検出中...（${leftCount}/${REQUIRED_FRAMES}）→ いいえ`;
+          } else {
+            rightCount = 0;
+            leftCount = 0;
+            detectStatus.textContent = "右手を上げる＝はい / 左手を上げる＝いいえ";
+          }
+
+          if (rightCount >= REQUIRED_FRAMES) {
+            detectStatus.textContent = "「はい」で回答しました";
+            answerGame(true);
+            return;
+          }
+
+          if (leftCount >= REQUIRED_FRAMES) {
+            detectStatus.textContent = "「いいえ」で回答しました";
+            answerGame(false);
+            return;
+          }
+        }
+      } else {
+        detectStatus.textContent = "肩から手まで画面に映してください";
+      }
+
+      animationId = requestAnimationFrame(predictLoop);
+    }
+
+    nextBtn.addEventListener("click", goToQuestionScreen);
+    retryBtn.addEventListener("click", startGame);
+    yesBtn.addEventListener("click", () => answerGame(true));
+    noBtn.addEventListener("click", () => answerGame(false));
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && screenStart.classList.contains("active")) {
+        goToQuestionScreen();
+      }
+    });
+
+    window.addEventListener("beforeunload", () => {
+      stopCameraLoop();
+    });
+
+    startGame();
+  </script>
+</body>
+</html>
